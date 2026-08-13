@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Siphon — grab any video in 4K</title>
+<style>
+  :root {
+    /* Deep ink + a single liquid-teal "coolant" accent. No purple anywhere. */
+    --ink:      #0b0e10;   /* page background            */
+    --ink-2:    #12161a;   /* raised surface             */
+    --ink-3:    #1a2026;   /* inset / field background   */
+    --line:     #232b32;   /* hairline borders           */
+    --line-2:   #2f3a42;
+    --text:     #eceae4;   /* warm white                 */
+    --text-dim: #8b968f;   /* muted, faintly warm        */
+    --coolant:  #2ee6c9;   /* signature accent           */
+    --coolant-d:#17b89d;
+    --coolant-glow: rgba(46,230,201,.16);
+    --amber:    #f0b45a;   /* warnings only              */
+    --red:      #ff6b6b;
+    --r:   12px;
+    --r-lg:18px;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--sans); background: var(--ink); color: var(--text);
+    line-height: 1.5; min-height: 100%;
+    -webkit-font-smoothing: antialiased;
+    /* faint pooled glow at the top, like light through liquid */
+    background-image:
+      radial-gradient(60% 42% at 50% -8%, var(--coolant-glow), transparent 70%);
+    background-repeat: no-repeat;
+  }
+
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 26px; max-width: 720px; margin: 0 auto;
+  }
+  .wordmark { display: flex; align-items: center; gap: 10px;
+              font-weight: 800; letter-spacing: -.02em; font-size: 18px; }
+  .drop {
+    width: 20px; height: 20px; flex: 0 0 auto;
+    filter: drop-shadow(0 0 6px var(--coolant-glow));
+  }
+  .top a { color: var(--text-dim); text-decoration: none; font-size: 13px;
+           font-weight: 600; transition: color .15s; }
+  .top a:hover { color: var(--text); }
+
+  .stage { max-width: 720px; margin: 0 auto; padding: 26px 26px 96px; }
+
+  .hero { text-align: center; padding: 26px 0 30px; }
+  .hero h1 { font-size: clamp(30px, 6vw, 46px); font-weight: 800;
+             letter-spacing: -.03em; line-height: 1.04; }
+  .hero h1 .glow { color: var(--coolant); }
+  .hero p { color: var(--text-dim); font-size: 15px; margin-top: 12px; }
+
+  /* Primary action: a big paste-and-go bar */
+  .caster { position: relative; margin-top: 8px; }
+  .url-field {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--ink-2); border: 1px solid var(--line);
+    border-radius: var(--r-lg); padding: 8px 8px 8px 18px;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .url-field:focus-within {
+    border-color: var(--coolant-d);
+    box-shadow: 0 0 0 4px var(--coolant-glow);
+  }
+  .url-field .pin { color: var(--text-dim); flex: 0 0 auto; }
+  #url {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 16px; font-family: var(--mono);
+    letter-spacing: -.01em; min-width: 0;
+  }
+  #url::placeholder { color: #5c665f; }
+  .btn-go {
+    flex: 0 0 auto; border: none; cursor: pointer;
+    background: linear-gradient(180deg, var(--coolant), var(--coolant-d));
+    color: #04211c; font-weight: 800; font-size: 15px; letter-spacing: -.01em;
+    padding: 13px 24px; border-radius: 12px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .12s, filter .18s, opacity .18s;
+  }
+  .btn-go:hover { filter: brightness(1.06); }
+  .btn-go:active { transform: translateY(1px); }
+  .btn-go:disabled { opacity: .55; cursor: not-allowed; filter: none; }
+
+  /* Options row */
+  .opts { display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+          justify-content: center; margin-top: 22px; }
+  .opt { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .opt .lab { font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+              letter-spacing: .12em; color: var(--text-dim); }
+  .seg { display: inline-flex; background: var(--ink-3); border: 1px solid var(--line);
+         border-radius: 11px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: none; background: transparent; color: var(--text-dim);
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    padding: 7px 12px; border-radius: 8px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { background: var(--coolant); color: #04211c; }
+  .toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+            font-size: 13px; color: var(--text); user-select: none; }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .track { width: 38px; height: 22px; border-radius: 999px; background: var(--ink-3);
+           border: 1px solid var(--line-2); position: relative; transition: background .18s; }
+  .track::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+                  border-radius:50%; background:var(--text-dim); transition: transform .18s, background .18s; }
+  .toggle input:checked + .track { background: var(--coolant); border-color: var(--coolant); }
+  .toggle input:checked + .track::after { transform: translateX(16px); background:#04211c; }
+
+  .go-note { text-align: center; color: var(--text-dim); font-size: 12.5px; margin-top: 22px; }
+  .go-note strong { color: #b9c2bb; font-weight: 600; }
+
+  /* Progress — a liquid siphon fill */
+  .flow { display: none; margin-top: 30px; }
+  .flow-head { display: flex; justify-content: space-between; align-items: baseline;
+               font-family: var(--mono); font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+  .flow-head .pct { color: var(--coolant); font-weight: 700; font-size: 15px; }
+  .tube { height: 12px; border-radius: 999px; background: var(--ink-3);
+          border: 1px solid var(--line); overflow: hidden; position: relative; }
+  .liquid { position: absolute; inset: 0; width: 0%;
+            background: linear-gradient(90deg, var(--coolant-d), var(--coolant));
+            border-radius: 999px; transition: width .35s ease; }
+  .liquid::after {
+    content: ''; position: absolute; inset: 0;
+    background-image: linear-gradient(120deg,
+      rgba(255,255,255,0) 30%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 70%);
+    background-size: 40px 100%; animation: sheen 1.1s linear infinite;
+  }
+  @keyframes sheen { from { background-position: -40px 0 } to { background-position: 260px 0 } }
+  .liquid.indef { width: 34% !important; animation: drift 1.3s ease-in-out infinite alternate; }
+  @keyframes drift { from { margin-left: -6% } to { margin-left: 78% } }
+
+  /* Result card */
+  .result { display: none; margin-top: 26px; border: 1px solid var(--line);
+            background: var(--ink-2); border-radius: var(--r-lg); padding: 20px; }
+  .result.ok  { border-color: rgba(46,230,201,.45); box-shadow: 0 0 0 4px var(--coolant-glow); }
+  .result.err { border-color: rgba(255,107,107,.5); }
+  .result .rtitle { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 9px; }
+  .result .rmeta { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
+  .result .rpath { font-family: var(--mono); font-size: 12px; color: var(--coolant);
+                   word-break: break-all; margin-top: 12px;
+                   background: var(--ink-3); border: 1px solid var(--line);
+                   border-radius: 9px; padding: 9px 11px; }
+  .result.err .rtitle { color: var(--red); }
+
+  /* Library */
+  .vault { margin-top: 44px; }
+  .vault h2 { font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+              letter-spacing: .14em; color: var(--text-dim); margin-bottom: 14px;
+              display: flex; align-items: center; gap: 10px; }
+  .vault h2::after { content:''; flex:1; height:1px; background: var(--line); }
+  .item { display: flex; justify-content: space-between; gap: 14px; align-items: center;
+          padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--r);
+          margin-bottom: 8px; background: var(--ink-2); transition: border-color .15s; }
+  .item:hover { border-color: var(--line-2); }
+  .item .t { font-weight: 600; font-size: 14px; }
+  .item .c { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .item .r { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+             text-align: right; white-space: nowrap; }
+  .item .r b { color: var(--coolant); font-weight: 600; }
+  .empty { color: var(--text-dim); font-size: 13px; font-family: var(--mono);
+           border: 1px dashed var(--line); border-radius: var(--r); padding: 22px; text-align: center; }
+
+  .banner { display:none; margin: 18px 0 4px; padding: 15px 16px; border-radius: var(--r);
+            background: rgba(240,180,90,.08); border: 1px solid rgba(240,180,90,.3);
+            color: #f4cd93; font-size: 13px; }
+  .banner code { font-family: var(--mono); color: #ffe4b8; }
+  .banner .bhead { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .banner .brow { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .banner .binstall {
+    border: none; cursor: pointer; background: var(--amber); color: #2a1c05;
+    font-weight: 800; font-size: 13px; padding: 9px 16px; border-radius: 9px;
+    display: inline-flex; align-items: center; gap: 7px; transition: filter .15s, opacity .15s; }
+  .banner .binstall:hover { filter: brightness(1.06); }
+  .banner .binstall:disabled { opacity: .6; cursor: default; }
+  .banner .bmanual { color: #d8b483; font-size: 12px; }
+  .banner .bmini { flex: 1; min-width: 160px; height: 8px; border-radius: 999px;
+                   background: rgba(0,0,0,.25); overflow: hidden; display: none; }
+  .banner .bmini > i { display: block; height: 100%; width: 0%; border-radius: 999px;
+                       background: var(--amber); transition: width .3s ease; }
+
+  @media (max-width: 560px) {
+    .url-field { flex-wrap: wrap; padding: 14px; }
+    #url { width: 100%; order: 1; }
+    .btn-go { width: 100%; order: 2; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="wordmark">
+      <svg class="drop" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5Z"
+              fill="var(--coolant)" fill-opacity="0.16" stroke="var(--coolant)" stroke-width="1.6"/>
+        <path d="M9.5 15a2.5 2.5 0 0 0 2.5 2.5" stroke="var(--coolant)" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Siphon
+    </div>
+    <a href="https://github.com/tehironclad/siphon" target="_blank" rel="noopener">GitHub ↗</a>
+  </header>
+
+  <main class="stage">
+    <section class="hero">
+      <h1>Grab any video<br>in <span class="glow">real 4K</span>.</h1>
+      <p>Paste a link. Siphon pulls the highest-quality stream — video and a clean audio track — straight to your machine.</p>
+    </section>
+
+    <div id="banner" class="banner"></div>
+
+    <div class="caster">
+      <div class="url-field">
+        <svg class="pin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 6 6l-1 1M13.5 17.5l-1 1a4 4 0 0 1-6-6l1-1"
+                stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <input id="url" type="text" placeholder="https://youtu.be/…" autocomplete="off" spellcheck="false" />
+        <button id="go" class="btn-go">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Siphon
+        </button>
+      </div>
+
+      <div class="opts">
+        <div class="opt">
+          <span class="lab">Quality</span>
+          <div class="seg" id="res">
+            <button data-v="4k" class="on">4K</button>
+            <button data-v="1440">1440p</button>
+            <button data-v="1080">1080p</button>
+            <button data-v="720">720p</button>
+            <button data-v="best">Max</button>
+          </div>
+        </div>
+        <div class="opt">
+          <span class="lab">Format</span>
+          <div class="seg" id="fmt">
+            <button data-v="auto" class="on">Best (MKV)</button>
+            <button data-v="mp4">MP4</button>
+          </div>
+        </div>
+        <div class="opt">
+          <span class="lab">Audio</span>
+          <label class="toggle">
+            <input id="audio" type="checkbox" checked />
+            <span class="track"></span>
+            <span>WAV track</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="go-note">4K merges separate video + audio streams — needs <strong>ffmpeg</strong>, and large files take a couple of minutes.</div>
+
+      <div id="flow" class="flow">
+        <div class="flow-head"><span id="fmsg">Priming…</span><span id="fpct" class="pct"></span></div>
+        <div class="tube"><div id="fliquid" class="liquid"></div></div>
+      </div>
+
+      <div id="result" class="result"></div>
+    </div>
+
+    <section class="vault">
+      <h2>Siphoned</h2>
+      <div id="library"><div class="empty">Loading…</div></div>
+    </section>
+  </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let polling = null;
+
+// segmented controls
+function wireSeg(seg) {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...seg.children].forEach(c => c.classList.toggle('on', c === b));
+  });
+}
+function segValue(seg) { return seg.querySelector('.on')?.dataset.v; }
+wireSeg($('res')); wireSeg($('fmt'));
+
+function fmtDur(s) {
+  s = Math.round(s || 0);
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const MANUAL_FFMPEG = 'Or install it yourself — macOS <code>brew install ffmpeg</code> · ' +
+  'Windows <code>winget install ffmpeg</code> · Linux <code>apt install ffmpeg</code>';
+
+async function checkEnv() {
+  try {
+    const d = await (await fetch('/api/ffmpeg/status')).json();
+    if (d.available) { $('banner').style.display = 'none'; return; }
+    renderFfmpegBanner(d.can_auto_install);
+  } catch (e) {}
+}
+
+function renderFfmpegBanner(canAuto) {
+  const b = $('banner');
+  b.style.display = 'block';
+  b.innerHTML = `
+    <div class="bhead">⚠ ffmpeg is required to merge HD/4K streams.</div>
+    <div class="brow">
+      ${canAuto ? '<button id="ffgo" class="binstall">⤓ Install ffmpeg automatically</button>' : ''}
+      <div id="ffbar" class="bmini"><i id="ffbarfill"></i></div>
+      <span id="ffmsg" class="bmanual">${MANUAL_FFMPEG}</span>
+    </div>`;
+  const btn = document.getElementById('ffgo');
+  if (btn) btn.addEventListener('click', installFfmpeg);
+}
+
+let ffPoll = null;
+async function installFfmpeg() {
+  const btn = document.getElementById('ffgo');
+  const bar = document.getElementById('ffbar');
+  const fill = document.getElementById('ffbarfill');
+  const msg = document.getElementById('ffmsg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+  if (bar) bar.style.display = 'block';
+  try {
+    await fetch('/api/ffmpeg/install', { method: 'POST' });
+    ffPoll = setInterval(async () => {
+      const j = await (await fetch('/api/ffmpeg/install')).json();
+      if (msg) msg.innerHTML = escapeHtml(j.message || 'Working…');
+      if (fill && j.percent >= 0) fill.style.width = j.percent + '%';
+      if (j.status === 'done') {
+        clearInterval(ffPoll); ffPoll = null;
+        $('banner').style.display = 'none';
+      } else if (j.status === 'error') {
+        clearInterval(ffPoll); ffPoll = null;
+        if (btn) { btn.disabled = false; btn.textContent = '⤓ Retry install'; }
+        if (bar) bar.style.display = 'none';
+        if (msg) msg.innerHTML = '⚠ ' + escapeHtml(j.error || 'Install failed') + '. ' + MANUAL_FFMPEG;
+      }
+    }, 700);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '⤓ Retry install'; }
+    if (msg) msg.innerHTML = '⚠ ' + escapeHtml(e.message) + '. ' + MANUAL_FFMPEG;
+  }
+}
+
+async function loadLibrary() {
+  try {
+    const d = await (await fetch('/api/download/library')).json();
+    const box = $('library');
+    if (!d.items || !d.items.length) {
+      box.innerHTML = '<div class="empty">Nothing siphoned yet — paste a link above.</div>';
+      return;
+    }
+    box.innerHTML = d.items.map(it => `
+      <div class="item">
+        <div>
+          <div class="t">${escapeHtml(it.title || it.video_id)}</div>
+          <div class="c">${escapeHtml(it.channel || '')}</div>
+        </div>
+        <div class="r"><b>${it.width}×${it.height}</b> · ${Math.round(it.fps)}fps<br>${fmtDur(it.duration)}</div>
+      </div>`).join('');
+  } catch (e) {}
+}
+
+function setFlow(pct, msg) {
+  $('flow').style.display = 'block';
+  $('fmsg').textContent = msg || '';
+  const liq = $('fliquid');
+  if (pct < 0) { liq.classList.add('indef'); $('fpct').textContent = ''; }
+  else { liq.classList.remove('indef'); liq.style.width = pct + '%'; $('fpct').textContent = Math.round(pct) + '%'; }
+}
+
+function showResult(kind, html) {
+  const el = $('result');
+  el.style.display = 'block'; el.className = 'result ' + kind; el.innerHTML = html;
+}
+
+function finish(ok) {
+  $('go').disabled = false;
+  if (ok) $('flow').style.display = 'none';
+}
+
+async function poll(jobId) {
+  try {
+    const j = await (await fetch('/api/download/' + jobId)).json();
+    setFlow(j.percent, j.message);
+    if (j.status === 'done') {
+      clearInterval(polling); polling = null; finish(true);
+      const res = j.result || {};
+      showResult('ok', `
+        <div class="rtitle">✓ ${escapeHtml(res.title || 'Done')}</div>
+        <div class="rmeta">${res.width}×${res.height} · ${Math.round(res.fps)}fps · ${fmtDur(res.duration)}${res.channel ? ' · ' + escapeHtml(res.channel) : ''}</div>
+        <div class="rpath">${escapeHtml(res.local_path || '')}</div>`);
+      loadLibrary();
+    } else if (j.status === 'error') {
+      clearInterval(polling); polling = null; finish(false);
+      showResult('err', `<div class="rtitle">Siphon failed</div><div class="rmeta">${escapeHtml(j.error || 'Unknown error')}</div>`);
+    }
+  } catch (e) {}
+}
+
+async function start() {
+  const url = $('url').value.trim();
+  if (!url) { $('url').focus(); return; }
+  $('go').disabled = true;
+  $('result').style.display = 'none';
+  setFlow(-1, 'Priming…');
+  try {
+    const r = await fetch('/api/download', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        resolution: segValue($('res')),
+        prefer_mp4: segValue($('fmt')) === 'mp4',
+        extract_audio: $('audio').checked,
+      }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || ('HTTP ' + r.status)); }
+    const { job_id } = await r.json();
+    polling = setInterval(() => poll(job_id), 800); poll(job_id);
+  } catch (e) {
+    finish(false);
+    showResult('err', `<div class="rtitle">Couldn’t start</div><div class="rmeta">${escapeHtml(e.message)}</div>`);
+  }
+}
+
+$('go').addEventListener('click', start);
+$('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });
+checkEnv();
+loadLibrary();
+</script>
+</body>
+</html>
