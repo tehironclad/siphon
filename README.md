@@ -18,6 +18,17 @@ solves that end-to-end:
 - insists on the resolution you asked for (retrying on a token miss) instead of
   silently falling back to 360p.
 
+## Download (no setup)
+
+Grab the latest build from [**Releases**](https://github.com/tehironclad/siphon/releases)
+— the app bundles ffmpeg, Node, and the token server, so there's nothing else to
+install. Unzip and run **Siphon**.
+
+> The installer isn't code-signed (signing costs money; Siphon is free), so your
+> OS shows a one-time "unknown developer" warning:
+> - **Windows:** "More info" → "Run anyway"
+> - **macOS:** right-click the app → "Open" → "Open"
+
 ## Quick start (from source)
 
 ```bash

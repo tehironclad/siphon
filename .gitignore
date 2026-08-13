@@ -8,9 +8,11 @@ dist/
 .venv/
 venv/
 
-# PyInstaller
+# PyInstaller / build staging
 *.spec.bak
 /ffmpeg/
+/build_assets/
+/.pot-build/
 
 # OS
 .DS_Store
