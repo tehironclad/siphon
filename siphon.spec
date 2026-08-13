@@ -14,11 +14,22 @@ for name in ("ffmpeg", "node", "pot-server"):
     if d.exists():
         datas.append((str(d), name))
 
-# yt-dlp + the bgutil POT plugin must be fully collected (plugins are a
-# namespace package PyInstaller won't find on its own).
-hiddenimports = ["siphon", "siphon.server", "siphon.launcher"]
-hiddenimports += collect_submodules("uvicorn")
-for pkg in ("yt_dlp", "yt_dlp_plugins", "bgutil_ytdlp_pot_provider"):
+# Collect the app's own submodules (route handlers import them lazily, which
+# PyInstaller's static graph can miss) plus the server stack's runtime deps.
+hiddenimports = collect_submodules("siphon")
+hiddenimports += [
+    "h11", "httptools", "websockets", "websockets.legacy",
+    "uvicorn.protocols.http.h11_impl",
+    "uvicorn.protocols.http.httptools_impl",
+    "uvicorn.protocols.websockets.websockets_impl",
+    "uvicorn.protocols.websockets.wsproto_impl",
+    "uvicorn.lifespan.on", "uvicorn.loops.asyncio", "uvicorn.loops.auto",
+]
+
+# Fully collect the server stack, yt-dlp, and the bgutil POT plugin (a namespace
+# package PyInstaller won't find on its own).
+for pkg in ("uvicorn", "starlette", "fastapi", "anyio",
+            "yt_dlp", "yt_dlp_plugins", "bgutil_ytdlp_pot_provider"):
     try:
         d, b, h = collect_all(pkg)
         datas += d
@@ -37,7 +48,7 @@ except Exception:
 block_cipher = None
 
 a = Analysis(
-    [str(ROOT / "siphon" / "__main__.py")],
+    [str(ROOT / "run.py")],
     pathex=[str(ROOT)],
     binaries=[],
     datas=datas,

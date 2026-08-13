@@ -17,7 +17,19 @@ PORT = 8677
 
 def _serve() -> None:
     import uvicorn
-    uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")
+    try:
+        uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")
+    except Exception:
+        # Windowed builds have no console; persist startup crashes so they're
+        # diagnosable instead of silently killing the server thread.
+        import traceback
+        from .paths import base_dir
+        try:
+            base_dir().mkdir(parents=True, exist_ok=True)
+            (base_dir() / "siphon-error.log").write_text(traceback.format_exc())
+        except Exception:
+            pass
+        raise
 
 
 def _wait_ready(url: str, timeout: float = 15.0) -> bool:
