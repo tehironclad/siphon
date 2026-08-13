@@ -23,6 +23,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Windows CI consoles default to cp1252, which can't encode non-ASCII output.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent
 STAGE = ROOT / "build_assets"
 POT_VERSION_FALLBACK = "1.3.1"
@@ -104,7 +111,7 @@ def pyinstaller() -> None:
     print("== PyInstaller ==", flush=True)
     run([sys.executable, "-m", "PyInstaller", "--noconfirm", str(ROOT / "siphon.spec")])
     out = ROOT / "dist" / "Siphon"
-    print(f"\n✓ Built: {out}")
+    print(f"\nBuilt: {out}")
 
 
 def main() -> int:
