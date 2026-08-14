@@ -5,4 +5,4 @@ video at up to 4K, defeating YouTube's SABR gating, and hands you a clean file
 plus a separate audio track. No editor, no accounts, no cloud.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"

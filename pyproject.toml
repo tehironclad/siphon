@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siphon-dl"
-version = "0.1.0"
+version = "0.1.2"
 description = "Grab any video in real 4K — a tiny, focused downloader."
 readme = "README.md"
 requires-python = ">=3.10"

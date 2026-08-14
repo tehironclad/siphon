@@ -38,6 +38,10 @@ _MAX_ATTEMPTS = 4  # for HD/4K requests, to ride out PO-token misses
 
 def _ytdlp_cmd() -> list[str]:
     """Prefer this interpreter's yt_dlp so the bundled POT plugin loads."""
+    # Frozen build: sys.executable is the app, not Python, so `-m yt_dlp`
+    # won't work. Re-invoke ourselves as a yt-dlp multi-call (see run.py).
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "__ytdlp__"]
     if importlib.util.find_spec("yt_dlp") is not None:
         return [sys.executable, "-m", "yt_dlp"]
     if shutil.which("yt-dlp"):

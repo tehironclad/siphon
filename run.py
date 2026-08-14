@@ -14,6 +14,14 @@ import os
 import sys
 from pathlib import Path
 
+# Multi-call binary: our downloader can't run `python -m yt_dlp` in a frozen
+# build (sys.executable is the app, not Python), so it invokes THIS exe with a
+# marker instead. Running yt-dlp in-process here keeps it inside the frozen
+# environment, where the bundled bgutil PO-token plugin is importable.
+if len(sys.argv) > 1 and sys.argv[1] == "__ytdlp__":
+    import yt_dlp
+    sys.exit(yt_dlp.main(sys.argv[2:]))
+
 
 def _ensure_streams() -> None:
     if sys.stdout is not None and sys.stderr is not None:
